@@ -239,7 +239,7 @@
   // Fetch devices from server
   async function fetchDevices() {
     try {
-      const res = await fetch(API_BASE + '/devices', {
+      const res = await fetch(API_BASE + '/api/devices', {
         headers: { 'X-Auth-Token': AUTH_TOKEN }
       });
       if(!res.ok) throw new Error('Failed to fetch devices');
@@ -291,7 +291,7 @@
         const id = btn.dataset.id;
         const newName = prompt('Enter new device name:', devices[id].name || '');
         if(newName) {
-          await fetch(API_BASE + '/name-device', {
+          await fetch(API_BASE + '/api/name-device', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -308,7 +308,7 @@
   // Fetch jobs from server
   async function fetchJobs() {
     try {
-      const res = await fetch(API_BASE + '/jobs', {
+      const res = await fetch(API_BASE + '/api/jobs', {
         headers: { 'X-Auth-Token': AUTH_TOKEN }
       });
       if(!res.ok) throw new Error('Failed to fetch jobs');
@@ -337,7 +337,7 @@
       btn.onclick = async () => {
         const id = btn.dataset.id;
         if(confirm('Remove job ' + id + '?')) {
-          await fetch(API_BASE + '/remove', {
+          await fetch(API_BASE + '/api/remove', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -354,7 +354,7 @@
   // Fetch execution logs/pings
   async function fetchLogs() {
     try {
-      const res = await fetch(API_BASE + '/pings', {
+      const res = await fetch(API_BASE + '/api/pings', {
         headers: { 'X-Auth-Token': AUTH_TOKEN }
       });
       if(!res.ok) throw new Error('Failed to fetch logs');
@@ -403,7 +403,7 @@
     const targetDomain = domainsRaw.split(',').map(s => s.trim()).filter(Boolean).join(',');
 
     try {
-      const res = await fetch(API_BASE + '/send', {
+      const res = await fetch(API_BASE + '/api/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
