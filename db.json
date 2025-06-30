@@ -1,0 +1,13 @@
+{
+  "devices": {
+  },
+  "jobs": [],
+  "pings": [],
+  "admin": {
+    "username": "admin",
+    "password": "changeme"
+  },
+  "authTokens": [
+    "abc123456789"
+  ]
+}
