@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Logs Dashboard</title>
+<style>
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    background: #f0f2f5;
+    margin: 0;
+    padding: 20px;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+  }
+
+  /* Filters section styling */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 20px;
+    background: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .filter-group {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+  }
+  .filter-group label {
+    margin-bottom: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    color: #555;
+  }
+  .filter-group input, .filter-group select {
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  /* Buttons styling */
+  #clearBtn {
+    padding: 8px 16px;
+    background-color: #e74c3c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+  }
+  #clearBtn:hover {
+    background-color: #c0392b;
+  }
+
+  /* Table styles */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  thead {
+    background-color: #f7f7f7;
+  }
+  th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+  }
+  td {
+    padding: 12px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  /* Responsive adjustments */
+  @media(max-width: 768px){
+    .filters {
+      flex-direction: column;
+    }
+  }
+
+  /* Loading / message styling */
+  #message {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 16px;
+    color: #777;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>Logs Dashboard</h1>
+
+<!-- Filters -->
+<div class="filters">
+  <div class="filter-group">
+    <label for="deviceIdFilter">Device ID</label>
+    <input type="text" id="deviceIdFilter" placeholder="Filter by Device ID" />
+  </div>
+  <div class="filter-group">
+    <label for="jobIdFilter">Job ID</label>
+    <input type="text" id="jobIdFilter" placeholder="Filter by Job ID" />
+  </div>
+  <div class="filter-group">
+    <label for="statusFilter">Status</label>
+    <select id="statusFilter">
+      <option value="">All</option>
+      <option value="executed">Executed</option>
+      <option value="failed">Failed</option>
+      <option value="pending">Pending</option>
+      <option value="success">Success</option>
+    </select>
+  </div>
+  <div class="filter-group" style="display:flex; align-items:center; margin-top:auto;">
+    <button id="resetBtn" style="
+      padding: 8px 12px;
+      margin-right: 10px;
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;">Reset Filters</button>
+    <button id="clearBtn">Clear All Logs</button>
+  </div>
+</div>
+
+<!-- Log Table -->
+<div id="tableContainer">
+  <table id="logsTable">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Device ID</th>
+        <th>Job ID</th>
+        <th>Tab ID</th>
+        <th>Status</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- Status Message -->
+<div id="message"></div>
+</div>
+
+<script>
+const API_BASE = 'https://cookie-null-server.onrender.com';
+const AUTH_TOKEN = 'abc123456789';
+
+let logs = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+  fetchLogs();
+
+  document.getElementById('deviceIdFilter').addEventListener('input', renderFilteredLogs);
+  document.getElementById('jobIdFilter').addEventListener('input', renderFilteredLogs);
+  document.getElementById('statusFilter').addEventListener('change', renderFilteredLogs);
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    document.getElementById('deviceIdFilter').value = '';
+    document.getElementById('jobIdFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    renderFilteredLogs();
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if(confirm("Are you sure you want to clear all logs? This action cannot be undone.")){
+      clearLogs();
+    }
+  });
+});
+
+async function fetchLogs() {
+  showMessage('Loading logs...');
+  try {
+    const res = await fetch(`${API_BASE}/api/pings`, {
+      headers: { 'X-Auth-Token': AUTH_TOKEN }
+    });
+    if (!res.ok) throw new Error('Failed to fetch logs');
+    logs = await res.json();
+    renderFilteredLogs();
+    showMessage('');
+  } catch (e) {
+    showMessage('Error: ' + e.message);
+  }
+}
+
+function renderFilteredLogs() {
+  const tbody = document.querySelector('#logsTable tbody');
+  tbody.innerHTML = '';
+
+  const deviceFilter = document.getElementById('deviceIdFilter').value.toLowerCase();
+  const jobFilter = document.getElementById('jobIdFilter').value.toLowerCase();
+  const statusFilter = document.getElementById('statusFilter').value;
+
+  const filteredLogs = logs.filter(log => {
+    return (
+      log.deviceId.toLowerCase().includes(deviceFilter) &&
+      log.jobId.toLowerCase().includes(jobFilter) &&
+      (statusFilter === '' || log.status === statusFilter)
+    );
+  });
+
+  if (filteredLogs.length === 0) {
+    showMessage('No logs to display.');
+    return;
+  }
+
+  filteredLogs.forEach(log => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${formatTime(log.time)}</td>
+      <td>${escapeHTML(log.deviceId)}</td>
+      <td>${escapeHTML(log.jobId)}</td>
+      <td>${escapeHTML(log.tabId)}</td>
+      <td>${capitalize(log.status)}</td>
+      <td>${escapeHTML(log.result || '')}</td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+function showMessage(msg) {
+  document.getElementById('message').textContent = msg;
+}
+
+function formatTime(timestamp) {
+  const date = new Date(timestamp);
+  return date.toLocaleString();
+}
+
+function escapeHTML(str) {
+  if (typeof str !== 'string') {
+    // If str is null, undefined, number, object, etc., convert to string safely
+    str = String(str ?? '');
+  }
+  return str.replace(/[&<>"']/g, m => {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    };
+    return map[m];
+  });
+}
+
+function capitalize(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+async function clearLogs() {
+  showMessage('Clearing logs...');
+  try {
+    const res = await fetch(`${API_BASE}/api/clear-logs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Auth-Token': AUTH_TOKEN
+      }
+    });
+    if (!res.ok) throw new Error('Failed to clear logs');
+    logs = [];
+    renderFilteredLogs();
+    showMessage('All logs have been cleared.');
+  } catch (e) {
+    showMessage('Error: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

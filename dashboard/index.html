@@ -139,6 +139,15 @@
       flex-direction: column;
     }
   }
+
+   #executionLog {
+    display: inline-block;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  #executionLog:hover {
+    color: green;
+  }
 </style>
 </head>
 <body>
@@ -182,7 +191,7 @@
     <button id="sendCustomBtn">Send Script</button>
   </section>
   <section id="logSection">
-    <h2>Execution Log</h2>
+   <h2 id="executionLog">Execution Log</h2>
     <div id="logList"></div>
   </section>
 </main>
@@ -434,6 +443,10 @@
 
   // Poll logs every 5 seconds
   setInterval(fetchLogs, 5000);
+
+   document.getElementById('executionLog').addEventListener('click', () => {
+    window.location.href = '/logs.html';
+  });
 </script>
 </body>
 </html>

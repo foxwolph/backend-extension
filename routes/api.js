@@ -86,6 +86,16 @@ router.post('/name-device', (req, res) => {
   res.sendStatus(200);
 });
 
+// Make sure you have loadDB and saveDB functions defined
+// Example: loadDB() returns { pings: [ ... ] }
+router.post('/clear-logs', (req, res) => {
+  const { body } = req;
+  // Optional: add auth check here
+  const db = loadDB();
+  db.pings = []; // Clear all logs
+  saveDB(db);
+  res.sendStatus(200);
+});
 
 router.get('/devices', (req, res) => res.json(loadDB().devices));
 router.get('/jobs', (req, res) => res.json(loadDB().jobs));
